@@ -1,0 +1,45 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper function to check if a user is an administrator
+    function isAdmin() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+
+    // Rules for the 'users' collection
+    match /users/{userId} {
+      // CREATE: A user can create their own profile document.
+      allow create: if request.auth.uid == userId;
+
+      // READ: 
+      // - A user can read their own document.
+      // - An admin can read any user's document.
+      allow get: if request.auth.uid == userId || isAdmin();
+      
+      // An admin can query/list all users.
+      allow list: if isAdmin();
+
+      // UPDATE:
+      // - A user can update their own document.
+      // - An admin can update any user document (e.g., to suspend them).
+      allow update: if request.auth.uid == userId || isAdmin();
+      
+      // DELETE: Only an admin can delete a user document.
+      allow delete: if isAdmin();
+    }
+
+    // Rules for the 'settings' collection
+    match /settings/{docId} {
+        // READ: Any authenticated user can read settings (e.g., the API route needs to read the API key).
+        allow get: if request.auth.uid != null;
+        
+        // WRITE: Only administrators can write to settings (e.g., generate a new API key).
+        allow write: if isAdmin();
+
+        // No one should be able to list all settings documents.
+        allow list: if false;
+    }
+  }
+}
